@@ -2693,7 +2693,7 @@ TIMER_CALLBACK_MEMBER(specnext_state::irq_off)
 
 TIMER_CALLBACK_MEMBER(specnext_state::irq_on)
 {
-	LOGINTVVV("<Frame IRQ>\n");
+	LOGINTVVV("<ULA/Frame IRQ>\n");
 	m_im2_ula->irq_w(ASSERT_LINE);
 	if (m_nr_c0_int_mode_pulse_0_im2_1 == 0)
 		m_irq_off_timer->adjust(m_maincpu->clocks_to_attotime(32));
@@ -3050,10 +3050,10 @@ void specnext_state::map_io(address_map &map)
 	}));
 
 	map(0x2001, 0x2001).mirror(0x0ffc).lr8(NAME([]() {
-		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0x00;
+		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0xff;
 	}));
 	map(0x3001, 0x3001).mirror(0x0ffc).lrw8(NAME([]() {
-		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0x00;
+		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0xff;
 	}), NAME([this](u8 data) {
 		if (m_nr_d8_io_trap_fdc_en)
 		{
