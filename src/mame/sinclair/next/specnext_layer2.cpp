@@ -187,7 +187,7 @@ void specnext_layer2_device::do_draw(screen_device &screen, bitmap_rgb32 &bitmap
 	for (u16 vpos = clip.top(); vpos <= clip.bottom(); vpos++)
 	{
 		u16 y = vpos - offset_v + m_scroll_y;
-		if (false && m_scroll_y >= info[1] && info[4] == 256) // TODO
+		if (m_scroll_y >= info[1] && info[4] == 256)
 			y -= info[1]; // scrolls over
 		else
 			y %= info[1]; // wraps around
