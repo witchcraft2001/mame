@@ -179,10 +179,19 @@ void specnext_layer2_device::do_draw(screen_device &screen, bitmap_rgb32 &bitmap
 	const u16 pen_base = m_layer2_palette_select ? m_palette_alt_offset : m_palette_base_offset;
 	u16 x_min = ((clip.left() - offset_h) >> 1) + m_scroll_x;
 	const bool x_scrollover = m_scroll_x >= info[0] && info[3] == 256;
-	if (x_scrollover) x_min -= info[0];
+	if (x_scrollover)
+		x_min -= info[0]; // scrolls over
+	else
+		x_min %= info[0]; // wraps around
+
 	for (u16 vpos = clip.top(); vpos <= clip.bottom(); vpos++)
 	{
-		const u16 y = (vpos - offset_v + m_scroll_y) % info[1];
+		u16 y = vpos - offset_v + m_scroll_y;
+		if (false && m_scroll_y >= info[1] && info[4] == 256) // TODO
+			y -= info[1]; // scrolls over
+		else
+			y %= info[1]; // wraps around
+
 		u16 x = x_min;
 		const u8 *scr = m_host_ram_ptr + (m_layer2_active_bank << 14) + (y * info[4]) + (x * info[3]);
 		u32 *pix = &(bitmap.pix(vpos, clip.left()));
