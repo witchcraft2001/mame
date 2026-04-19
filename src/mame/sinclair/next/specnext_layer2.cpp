@@ -121,17 +121,21 @@ void specnext_layer2_device::draw_256(screen_device &screen, bitmap_rgb32 &bitma
 	const u16 offset_v = m_offset_v - info[2];
 	clip.offset(offset_h, offset_v);
 	clip &= cliprect;
-	clip.setx(clip.left() & ~1, clip.right() | 1);
 
 	do_draw(
 			screen, bitmap, blendprio, clip, info, offset_h, offset_v,
-			[this, &blend_op] (u16 pen_base, const u8 *scr, u32 *pix, u8 *prio, u32 *bprio, u16 &hpos, u16 &vpos)
+			[this, &blend_op] (u16 pen_base, const u8 *scr, u32 *pix, u8 *prio, u32 *bprio, u16 &hpos, u16 &vpos, bool skip_second)
 			{
 				const u16 idx = pen_base + ((*scr + (m_palette_offset << 4)) % 0x100);
 				const rgb_t pen = palette().pen_color(idx);
 				const bool is_prio_color = m_pen_priority[idx];
-				blend_op(prio[0], pix[0], bprio[0], pen, is_prio_color);
-				blend_op(prio[1], pix[1], bprio[1], pen, is_prio_color);
+				if (hpos & 1)
+					hpos ^= 1;
+				else
+					blend_op(prio[0], pix[0], bprio[0], pen, is_prio_color);
+
+				if (!skip_second)
+					blend_op(prio[1], pix[1], bprio[1], pen, is_prio_color);
 			});
 }
 
@@ -149,7 +153,7 @@ void specnext_layer2_device::draw_16(screen_device &screen, bitmap_rgb32 &bitmap
 
 	do_draw(
 			screen, bitmap, blendprio, clip, info, offset_h, offset_v,
-			[this, &blend_op] (u16 pen_base, const u8 *scr, u32 *pix, u8 *prio, u32 *bprio, u16 &hpos, u16 &vpos)
+			[this, &blend_op] (u16 pen_base, const u8 *scr, u32 *pix, u8 *prio, u32 *bprio, u16 &hpos, u16 &vpos, bool skip)
 			{
 				if (hpos & 1)
 					hpos ^= 1;
@@ -161,6 +165,7 @@ void specnext_layer2_device::draw_16(screen_device &screen, bitmap_rgb32 &bitmap
 					blend_op(prio[0], pix[0], bprio[0], pen, is_prio_color);
 				}
 
+				if (!skip)
 				{
 					const u16 idx = (pen_base | (m_palette_offset << 4)) + (*scr & 0x0f);
 					const rgb_t pen = palette().pen_color(idx);
@@ -197,9 +202,15 @@ void specnext_layer2_device::do_draw(screen_device &screen, bitmap_rgb32 &bitmap
 		u32 *pix = &(bitmap.pix(vpos, clip.left()));
 		u8 *prio = &(screen.priority().pix(vpos, clip.left()));
 		u32 *bprio = &(blendprio.pix(vpos, clip.left()));
+		if (clip.left() & 1)
+		{
+			pix -= 1;
+			prio -= 1;
+			bprio -= 1;
+		}
 		for (u16 hpos = clip.left(); hpos <= clip.right(); hpos += 2, pix += 2, prio += 2, bprio += 2)
 		{
-			plot_op(pen_base, scr, pix, prio, bprio, hpos, vpos);
+			plot_op(pen_base, scr, pix, prio, bprio, hpos, vpos, hpos == clip.right() && (~hpos & 1));
 
 			++x %= info[0];
 			if (x == 0  && !x_scrollover)
