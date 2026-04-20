@@ -2866,6 +2866,7 @@ u8 specnext_state::do_m1(offs_t offset)
 	m_divmmc->automap_nmi_delayed_on_w(0);
 
 	m_divmmc->cpu_m1_n_w(1);
+	m_divmmc->cpu_mreq_n_w(1);
 	m_divmmc->clock_w();
 	bank_update(0, 2);
 
