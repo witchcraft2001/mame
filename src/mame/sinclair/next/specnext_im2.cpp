@@ -35,11 +35,8 @@ int specnext_im2_device::z80daisy_irq_ack()
 
 void specnext_im2_device::z80daisy_irq_reti()
 {
-	if (m_state & Z80_DAISY_IEO)
-	{
-		m_state = 0;
-		m_irq_cb(CLEAR_LINE);
-	}
+	m_state = 0;
+	m_irq_cb(CLEAR_LINE);
 }
 
 void specnext_im2_device::irq_w(int state)
@@ -47,9 +44,8 @@ void specnext_im2_device::irq_w(int state)
 	if (state != CLEAR_LINE)
 		m_state = Z80_DAISY_INT;
 	else
-		m_state = 0;
-
-	m_irq_cb((m_state & Z80_DAISY_INT) ? ASSERT_LINE : CLEAR_LINE);
+		m_state &= ~Z80_DAISY_INT;
+	m_irq_cb(state);
 }
 
 
