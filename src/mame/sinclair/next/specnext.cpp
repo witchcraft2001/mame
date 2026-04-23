@@ -2413,9 +2413,11 @@ void specnext_state::reg_w(offs_t nr_wr_reg, u8 nr_wr_dat)
 		nr_6c_tm_default_attr_w(nr_wr_dat);
 		break;
 	case 0x6e:
+		m_screen->update_now();
 		nr_6e_tilemap_base_w(BIT(nr_wr_dat, 7), BIT(nr_wr_dat, 0, 6));
 		break;
 	case 0x6f:
+		m_screen->update_now();
 		nr_6f_tilemap_tiles_w(BIT(nr_wr_dat, 7), BIT(nr_wr_dat, 0, 6));
 		break;
 	case 0x70:
