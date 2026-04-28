@@ -750,7 +750,8 @@ void sprinter_state::dcp_w(offs_t offset, u8 data)
 	case 0x1b:
 		if (data & 0x80)
 		{
-			// RESET
+			m_isa[0]->reset();
+			m_isa[1]->reset();
 		}
 		if (data & 0x40)
 		{
