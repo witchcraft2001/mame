@@ -308,10 +308,10 @@ uint8_t dp8390_device::cs_read(offs_t offset) {
 	default:
 		if(m_variant == TYPE::RTL8019A) {
 			switch((offset & 0x0f)|(m_regs.cr & 0xc0)) {
-				case 0x0a:
+				case 0xca:
 					data = 'P';
 					break;
-				case 0x0b:
+				case 0xcb:
 					data = 'p';
 					break;
 
@@ -338,9 +338,6 @@ uint8_t dp8390_device::cs_read(offs_t offset) {
 					break;
 				case 0xc8:
 					data = m_8019regs.csnsav;
-					break;
-				case 0xcb:
-					data = m_8019regs.intr;
 					break;
 				default:
 					logerror("rtl8019: invalid read page %01X reg %02X\n", (m_regs.cr & 0xc0) >> 6, offset & 0x0f);
