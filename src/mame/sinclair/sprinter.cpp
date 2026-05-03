@@ -91,6 +91,24 @@ TODO:
 
 namespace {
 
+static DEVICE_INPUT_DEFAULTS_START(sprinter_isa_com_rs232_defaults)
+	DEVICE_INPUT_DEFAULTS("RS232_TXBAUD", 0xff, RS232_BAUD_115200)
+	DEVICE_INPUT_DEFAULTS("RS232_RXBAUD", 0xff, RS232_BAUD_115200)
+	DEVICE_INPUT_DEFAULTS("RS232_DATABITS", 0xff, RS232_DATABITS_8)
+	DEVICE_INPUT_DEFAULTS("RS232_PARITY", 0xff, RS232_PARITY_NONE)
+	DEVICE_INPUT_DEFAULTS("RS232_STOPBITS", 0xff, RS232_STOPBITS_1)
+	DEVICE_INPUT_DEFAULTS("FLOW_CONTROL", 0x07, 0x01)
+DEVICE_INPUT_DEFAULTS_END
+
+static void sprinter_isa_com_config(device_t *device)
+{
+	device->subdevice("uart_0")->set_unscaled_clock(XTAL(14'745'600));
+
+	auto *serport0 = device->subdevice<rs232_port_device>("serport0");
+	serport0->set_option_device_input_defaults("null_modem", DEVICE_INPUT_DEFAULTS_NAME(sprinter_isa_com_rs232_defaults));
+	serport0->set_option_device_input_defaults("terminal", DEVICE_INPUT_DEFAULTS_NAME(sprinter_isa_com_rs232_defaults));
+}
+
 class sprinter_state : public spectrum_128_state
 {
 public:
@@ -2075,11 +2093,13 @@ void sprinter_state::sprinter(machine_config &config)
 
 	ISA8(config, m_isa[0], X_SP / 5);
 	m_isa[0]->set_custom_spaces();
-	ISA8_SLOT(config, "isa0", 0, m_isa[0], pc_isa8_cards, "zxbus_adapter", false);
+	ISA8_SLOT(config, "isa0", 0, m_isa[0], pc_isa8_cards, "zxbus_adapter", false)
+		.set_option_machine_config("com", sprinter_isa_com_config);
 
 	ISA8(config, m_isa[1], X_SP / 5);
 	m_isa[1]->set_custom_spaces();
-	ISA8_SLOT(config, "isa1", 0, m_isa[1], pc_isa8_cards, nullptr, false);
+	ISA8_SLOT(config, "isa1", 0, m_isa[1], pc_isa8_cards, nullptr, false)
+		.set_option_machine_config("com", sprinter_isa_com_config);
 
 	m_screen->set_raw(X_SP / 3, SPRINT_WIDTH, SPRINT_HEIGHT, { 0, SPRINT_XVIS - 1, 0, SPRINT_YVIS - 1 });
 	m_screen->set_screen_update(FUNC(sprinter_state::screen_update));
