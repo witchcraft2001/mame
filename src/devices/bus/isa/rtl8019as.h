@@ -29,6 +29,7 @@ protected:
 	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
 
 private:
+	static uint16_t decode_iobase(uint8_t config);
 	static uint8_t decode_irq(uint8_t config);
 
 	uint8_t port_r(offs_t offset);

@@ -81,6 +81,8 @@ void dp8390_device::do_tx() {
 	buf.resize(m_regs.tbcr);
 	for(i = 0; i < m_regs.tbcr; i++) buf[i] = m_mem_read_cb(high16 + (m_regs.tpsr << 8) + i);
 
+	if(m_variant == TYPE::RTL8019A) osd_printf_verbose("rtl8019as: tx len=%u\n", m_regs.tbcr);
+
 	if(send(&buf[0], m_regs.tbcr)) {
 		m_regs.tsr = 1;
 		m_regs.isr |= 2;
@@ -177,6 +179,7 @@ void dp8390_device::recv(uint8_t *buf, int len) {
 }
 
 void dp8390_device::recv_cb(uint8_t *buf, int len) {
+	if(m_variant == TYPE::RTL8019A) osd_printf_verbose("rtl8019as: rx len=%d\n", len);
 	if(!LOOPBACK) recv(buf, len);
 }
 
@@ -308,10 +311,10 @@ uint8_t dp8390_device::cs_read(offs_t offset) {
 	default:
 		if(m_variant == TYPE::RTL8019A) {
 			switch((offset & 0x0f)|(m_regs.cr & 0xc0)) {
-				case 0xca:
+				case 0x0a:
 					data = 'P';
 					break;
-				case 0xcb:
+				case 0x0b:
 					data = 'p';
 					break;
 
@@ -338,6 +341,9 @@ uint8_t dp8390_device::cs_read(offs_t offset) {
 					break;
 				case 0xc8:
 					data = m_8019regs.csnsav;
+					break;
+				case 0xcb:
+					data = m_8019regs.intr;
 					break;
 				default:
 					logerror("rtl8019: invalid read page %01X reg %02X\n", (m_regs.cr & 0xc0) >> 6, offset & 0x0f);

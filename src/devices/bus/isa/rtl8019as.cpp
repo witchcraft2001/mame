@@ -57,7 +57,9 @@ void isa8_rtl8019as_device::device_add_mconfig(machine_config &config)
 
 void isa8_rtl8019as_device::device_start()
 {
-	m_iobase = 0x0300;
+	const uint8_t config = ioport("CONFIG")->read();
+	m_iobase = decode_iobase(config);
+	m_irq = decode_irq(config);
 
 	std::fill(std::begin(m_prom), std::end(m_prom), 0x57);
 	std::fill(std::begin(m_board_ram), std::end(m_board_ram), 0x00);
@@ -91,6 +93,18 @@ void isa8_rtl8019as_device::device_reset()
 	const uint8_t config = ioport("CONFIG")->read();
 	m_irq = decode_irq(config);
 	std::copy_n(&m_dp8390->get_mac()[0], 6, m_prom);
+}
+
+
+uint16_t isa8_rtl8019as_device::decode_iobase(uint8_t config)
+{
+	switch (config & 0x30)
+	{
+	case 0x10: return 0x0320;
+	case 0x20: return 0x0340;
+	case 0x30: return 0x0360;
+	default:   return 0x0300;
+	}
 }
 
 
@@ -223,6 +237,11 @@ static INPUT_PORTS_START(rtl8019as)
 	PORT_CONFSETTING(0x01, "IRQ3")
 	PORT_CONFSETTING(0x02, "IRQ4")
 	PORT_CONFSETTING(0x03, "IRQ5")
+	PORT_CONFNAME(0x30, 0x00, "RTL8019AS I/O base")
+	PORT_CONFSETTING(0x00, "0x300")
+	PORT_CONFSETTING(0x10, "0x320")
+	PORT_CONFSETTING(0x20, "0x340")
+	PORT_CONFSETTING(0x30, "0x360")
 INPUT_PORTS_END
 
 
