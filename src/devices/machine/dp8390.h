@@ -23,6 +23,7 @@ public:
 	uint16_t remote_read();
 	uint8_t cs_read(offs_t offset);
 	void dp8390_reset(int state);
+	uint8_t rtl8019_bpage() const { return m_8019regs.bpage; }
 	void recv_cb(uint8_t *buf, int len) override;
 
 protected:

@@ -216,9 +216,12 @@ int pcap_module::netdev_pcap::send(void const *buf, int len)
 		return 0;
 	}
 	int ret = (*m_module.pcap_sendpacket_dl)(m_p, reinterpret_cast<const u_char *>(buf), len);
-	printf("sent packet length %d, returned %d\n", len, ret);
-	return ret ? len : 0;
-	//return (!pcap_sendpacket_dl(m_p, reinterpret_cast<const u_char *>(buf), len)) ? len : 0;
+	if (ret)
+	{
+		osd_printf_error("Unable to send pcap packet, pcap_sendpacket returned %d\n", ret);
+		return 0;
+	}
+	return len;
 }
 
 int pcap_module::netdev_pcap::recv_dev(uint8_t **buf)

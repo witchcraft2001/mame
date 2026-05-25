@@ -30,7 +30,11 @@ SPRINTER_DEBUG=0 ./run_sprinter_rtl8019as.sh
 
 Default I/O base: `0x300`.
 
-I/O base в первом этапе фиксирован: `0x300`.
+Поддержанные I/O base values:
+
+```text
+0x300, 0x320, 0x340, 0x360
+```
 
 Default IRQ: `3`.
 
@@ -40,9 +44,8 @@ Default IRQ: `3`.
 IRQ2/9, IRQ3, IRQ4, IRQ5
 ```
 
-На этом этапе IRQ реализован как MAME input port, а I/O base фиксирован в
-устройстве. Скрипт печатает переменные `RTL8019AS_IOBASE`, `RTL8019AS_IRQ`,
-`RTL8019AS_MAC` и
+IRQ, I/O base и PROM layout реализованы как MAME input ports. Скрипт печатает
+переменные `RTL8019AS_IOBASE`, `RTL8019AS_IRQ`, `RTL8019AS_MAC` и
 `RTL8019AS_NETDEV` для диагностики, но не применяет их как ложные command-line
 override. Изменение input ports выполняется стандартными средствами MAME
 configuration/UI, а дополнительные аргументы можно передать в конец команды
@@ -57,7 +60,7 @@ MAC генерируется устройством при старте в ло�
 Фактический MAC печатается в log при запуске:
 
 ```text
-rtl8019as: start io=0300 irq=3 mac=02:80:19:xx:xx:xx
+rtl8019as: start io=0300 irq=3 prom=direct mac=02:80:19:xx:xx:xx
 ```
 
 ## Программная модель для DSS
@@ -89,12 +92,56 @@ PROM[0..5]          MAC
 PROM[6..31]         0x57
 ```
 
-Для RTL8019A page 3 ID ранняя диагностика может выбрать CR page 3 и читать:
+PROM layout можно переключить через MAME input port:
 
 ```text
-reg 0x0a -> 'P'
-reg 0x0b -> 'p'
+Direct 8-bit     PROM[0..5] = MAC
+Doubled bytes    PROM[0]=MAC0, PROM[1]=MAC0, PROM[2]=MAC1, ...
 ```
+
+Драйвер должен читать 32 байта PROM с `RSAR=0x0000` и уметь определить оба
+варианта.
+
+Для RTL8019A ID ранняя диагностика должна читать page 0:
+
+```text
+CR page 0
+read reg 0x0a -> 'P'
+read reg 0x0b -> 'p'
+```
+
+Page 3 `0x0b` в datasheet - это `INTR`, а `0x0e..0x0f` зарезервированы.
+
+Remote DMA command values:
+
+```text
+CR=0x0a  start + remote read
+CR=0x12  start + remote write
+CR=0x1a  start + send packet
+CR=0x22  start + remote DMA abort/no DMA
+```
+
+RX ring header перед каждым принятым кадром:
+
+```text
+byte 0  receive status
+byte 1  next page
+byte 2  length low, includes 4-byte header
+byte 3  length high
+```
+
+Reset sequence для драйвера:
+
+```text
+tmp = IN  BASE+0x1f
+OUT BASE+0x1f,tmp
+delay
+tmp = IN  BASE+0x1f
+wait ISR.RST == 1
+OUT BASE+0x07,0xff
+```
+
+После reset MAME/DP8390 выставляет `ISR=0x80`.
 
 ## Диагностика
 
@@ -110,18 +157,29 @@ reg 0x0b -> 'p'
 ../mame/mame sprinter -isa1 rtl8019as -listdevices
 ```
 
-Verbose-запуск:
+Verbose-запуск и pcap:
 
 ```bash
 ../mame/mame sprinter -isa1 rtl8019as -verbose
+../mame/mame sprinter -isa1 rtl8019as -networkprovider pcap -verbose
 ./run_sprinter_rtl8019as.sh -verbose
 RTL8019AS_VERBOSE=1 ./run_sprinter_rtl8019as.sh
+```
+
+На macOS эта сборка MAME обычно поддерживает `-networkprovider pcap` или
+`none`; `slirp` не доступен. Проверить доступные интерфейсы:
+
+```bash
+../mame/mame -listnetwork
 ```
 
 Ожидаемые log-строки:
 
 ```text
-rtl8019as: start io=0300 irq=3 mac=...
+rtl8019as: start io=0300 irq=3 prom=direct mac=...
+rtl8019as: tx len=...
+rtl8019as: rx len=...
+rtl8019as: loopback tx len=...
 rtl8019as: reset assert
 rtl8019as: reset clear
 rtl8019as: irq3 state=1

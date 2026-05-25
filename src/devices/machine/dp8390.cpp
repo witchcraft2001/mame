@@ -69,7 +69,6 @@ void dp8390_device::do_tx() {
 	int i;
 	uint32_t high16 = (m_regs.dcr & 4)?m_regs.rsar<<16:0;
 	if(m_reset) return;
-	if(LOOPBACK) return;  // TODO: loopback
 	m_regs.tsr = 0;
 	if(m_regs.tbcr > 1518) logerror("dp8390: trying to send overlong frame\n");
 	if(!m_regs.tbcr) { // ? Bochs says solaris actually does this
@@ -83,7 +82,12 @@ void dp8390_device::do_tx() {
 
 	if(m_variant == TYPE::RTL8019A) osd_printf_verbose("rtl8019as: tx len=%u\n", m_regs.tbcr);
 
-	if(send(&buf[0], m_regs.tbcr)) {
+	if(LOOPBACK) {
+		if(m_variant == TYPE::RTL8019A) osd_printf_verbose("rtl8019as: loopback tx len=%u\n", m_regs.tbcr);
+		m_regs.tsr = 1;
+		m_regs.isr |= 2;
+		recv(&buf[0], m_regs.tbcr);
+	} else if(send(&buf[0], m_regs.tbcr)) {
 		m_regs.tsr = 1;
 		m_regs.isr |= 2;
 	} else {
@@ -477,6 +481,10 @@ void dp8390_device::cs_write(offs_t offset, uint8_t data) {
 		if(m_variant == TYPE::RTL8019A) {
 			switch((offset & 0x0f)|(m_regs.cr & 0xc0)) {
 				// XXX: rest of the regs
+				case 0xc2:
+					m_8019regs.bpage = data;
+					return;
+
 				default:
 					logerror("rtl8019: invalid write page %01X reg %02X data %04X\n", (m_regs.cr & 0xc0) >> 6, offset & 0x0f, data);
 					return;
