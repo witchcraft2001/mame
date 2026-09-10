@@ -160,8 +160,10 @@ MAME input setting должен позволять выбрать все 31 зн
 
 ### 6.2. MAC и EEPROM
 
-EEPROM остаётся read-only с точки зрения версии 1. Не добавлять NVRAM-запись и
-не делать изменение постоянной конфигурации условием теста.
+Предусмотрены два профиля: `Dynamic` (default, configured/уникальный MAC и
+физический PnP resource block) и неизменяемый `Physical TPO fixture`. Запись
+dynamic EEPROM остаётся только volatile; fixture игнорирует write/erase и
+после каждого чтения остаётся точным golden dump.
 
 Минимально согласованный образ EEPROM:
 
@@ -181,6 +183,7 @@ EEPROM остаётся read-only с точки зрения версии 1. Н�
 | `13h` | Internal Configuration high word: допустимая partition и classic activation |
 | `14h` | Secondary Software Information, revision 1 для B |
 | `17h` | Secondary checksums |
+| `18h..3Fh` | ISA PnP serial/resource data физической TPO |
 
 Для 32 KiB byte-wide SRAM нижнее слово Internal Configuration должно отражать
 RAM SIZE `010b`. Partition выбирается документированным значением; практичный
@@ -192,6 +195,33 @@ Default MAC генерируется один раз при старте экз�
 совместимость с MAME `Configure Network Devices`, где пользователь может
 назначить MAC. EEPROM, station address и network interface обязаны показывать
 одно и то же значение после reset.
+
+Порядок байтов EEPROM подтверждён физической картой: Address(2n) находится в
+старшем байте word, Address(2n+1) — в младшем. Например,
+`02:60:8C:12:34:56` кодируется как `0260 8C12 3456`. Это не меняет
+little-endian ISA cycles Window 2, где те же пары читаются как
+`6002 128C 5634`.
+
+Checksums считаются последними. Для `0Fh` сохраняются primary
+vital/configurable lanes. Для `17h` vital lane покрывает
+`10h..12h + 18h..3Fh`, configurable lane — `13h..16h`. Dynamic PnP serial:
+`1Ah=word 02h`, `1Bh=word 01h`; младший байт `1Ch` вычисляется LFSR по
+[ISA PnP 1.0a](https://ieeemilestones.ethw.org/w/images/7/7f/PNP-ISA-v1.0a.pdf),
+seed `6Ah`, биты каждого байта LSB-first.
+
+Golden dump 3C509B-TPO `EA=00:20:AF:5D:69:8B`, два чтения `EL3EEP` от
+8 сентября 2026 года:
+
+```text
+00: 0020 AF5D 698B 9550 B434 0041 4A41 6D50
+08: 0010 3000 0020 AF5D 698B 1310 0000 3223
+10: 2083 0000 0000 0004 0001 0000 0000 0205
+18: 6D50 9550 698B AF5D 0A5B 1010 1982 3300
+20: 6F43 206D 4333 3035 4239 4520 6874 7265
+28: 694C 6B6E 4920 4949 5015 506D 0295 411C
+30: 80D0 22F7 9EA8 0147 0210 03E0 1010 3779
+38: 0000 0000 0000 0000 0000 0000 0000 0000
+```
 
 Обычное EEPROM-чтение через Window 0:
 
@@ -233,6 +263,10 @@ LFSR начинается с `0xFF`, использует полином `0xCF`,
   команды согласно руководству;
 - для одного экземпляра Sprinter это всё равно проверяется отрицательными
   тестами, чтобы ID state machine не была только «магической разблокировкой».
+
+В частности, `D0` оставляет tag равным нулю: активированная карта снова
+участвует в следующей ID sequence. Два полных EEPROM discovery подряд не
+требуют Global Reset и не меняют состояние 10BASE-T recovery.
 
 После аппаратного/global reset должен пройти AUTOINIT delay. В этот период
 операционное окно невидимо, а преждевременный ID sequence не принимается.
@@ -355,6 +389,10 @@ Status, даже если IRQ line не подключена.
 - сетевой TX завершается по таймеру `device_network_interface` на скорости
   10 Mbit/s, а не внутри последней FIFO write.
 
+В модели граница AUTOINIT зафиксирована ровно на 310 мкс. Она не включает
+восстановление аналогового TPO-тракта, которое имеет собственное состояние и
+timer, описанные ниже.
+
 Драйвер клиента всё равно использует тайм-ауты, поэтому тесты должны покрывать
 и нормальное снятие CIP, и искусственно зависший fault-injection режим.
 
@@ -416,6 +454,12 @@ Jabber и underrun требуют состояния `TX Reset required`, TX dis
 - текущий byte cursor;
 - занятое место FIFO.
 
+Для внешнего pcap backend длина 14–59 байт нормализуется до Ethernet minimum
+60 байт нулевым padding. Это требуется для виртуальных интерфейсов вроде
+macOS `feth`, которые передают корректный 42-байтовый ARP frame без padding,
+обычно добавляемого физическим MAC. Internal loopback не нормализуется, чтобы
+runt/error semantics контроллера оставались доступны для тестирования.
+
 RX Status показывает только head packet. Поле RX Bytes уменьшается по мере
 чтения фактических данных. Чтение допустимого padding может перевести 11-bit
 count в отрицательные значения, но чтение за пределами padding вызывает RX
@@ -468,6 +512,22 @@ RX Filter bits:
   backend отключён;
 - отсутствие link не должно зависать: TX/RX-код клиента заканчивается по
   тайм-ауту и получает диагностируемое состояние.
+
+Global Reset немедленно переводит link в `DOWN`. После завершения AUTOINIT,
+активации, выбора TPO и включения link beat начинается отдельный переход
+`DOWN → RECOVERING → READY`. Настройка `Link recovery` выбирает
+`Realistic (3 seconds)` (default) или `Immediate`. Повторные ID sequence,
+`Set Tag 0`, EEPROM read/activation, `RxReset` и `TxReset` recovery не
+перезапускают. Порядок activation/TPO/link-beat не важен; выбор другого
+трансивера инвалидирует TPO state, а возврат к TPO начинает recovery при уже
+выполненных остальных условиях. State и оставшееся время timer входят в save
+state.
+
+Media Status bit 11 устанавливается лишь в `READY`, при link beat enable и
+реально подключённом backend. Внешний RX до `READY` отбрасывается. Ранний TX
+не вызывает backend: кадр локально завершается по времени 10 Мбит/с,
+освобождает FIFO/Notify и не переигрывается после recovery. Internal loopback
+остаётся внутренним ASIC-path и не зависит от внешнего carrier.
 
 Net Diagnostic должен возвращать ASIC revision 2 в bits 5..1. Writable
 loopback bits 15..12 хранятся отдельно от read-only TX/RX state bits.
@@ -616,6 +676,7 @@ INIT/DONE и длительный обмен проходят без завис�
 - 255 LFSR bytes, первый `FF`, последний `98`, повтор после ошибки.
 - Encode/decode всех bases `0x200..0x3E0` и reject index `0x1F`.
 - EEPROM golden vector, MAC byte order, primary/secondary checksums.
+- PnP serial/checksum и negative validation после порчи word `18h`.
 - Trace 16-bit ISA8 access: low строго перед high; command только на high.
 - Отдельные byte accesses Status/Timer/TX Status/statistics.
 - FIFO aliases `+00/+02` и отсутствие side effects у `+01/+03`.
@@ -627,6 +688,9 @@ INIT/DONE и длительный обмен проходят без завис�
 - EEPROM Busy и CIP видны хотя бы на одном emulated tick.
 - Window 2 station byte order и Window 5 exact offsets.
 - Save/load с partially read RX и непустым TX Status stack.
+- Две независимые границы Global Reset: 310 мкс AUTOINIT и 3000 мс recovery.
+- Два discovery/activation подряд с `Set Tag 0`, без restart recovery.
+- Save/load посреди EEPROM read и посреди link recovery.
 
 ### 10.2. MAME/Sprinter tests
 
@@ -670,7 +734,16 @@ Devices` и сохраняется в локальном `cfg/sprinter.cfg`. И�
 operation, slot, ISA port, R/W, byte value, elapsed ticks
 ```
 
-Сравниваются:
+8–9 сентября 2026 года выполнен первый аппаратный прогон на 3C509B-TPO,
+assembly `03-0020-002`, revision 3, slot 0, ID port `0110h`, base `0300h`.
+Он подтвердил приведённый 64-word dump, big-endian-in-word MAC и inclusion
+`18h..1Fh` в secondary vital lane (`3223/0205`). После исправления клиента
+карта обнаружилась и работала. Global Reset дал link flap: первый успешный
+кадр наблюдался через 2–6 секунд, повторный attach без reset — через 0 секунд.
+Диапазон зависит от switch; детерминированные 3000 мс MAME являются test
+policy, а не заявленным silicon timing.
+
+В дальнейших аппаратных прогонах сравниваются:
 
 - EEPROM words `00..17` и checksums;
 - reset values окон 0, 3, 4 и 5;
@@ -708,6 +781,9 @@ TX/RX Free; обязательны совпадение порядка сост�
 - `EL3INFO`, `EL3REG`, `EL3LB`, `EL3TX`, `EL3RX` и затем `PING` завершаются с
   `RESULT OK`;
 - результаты MAME сопоставлены с трассами реальной 3C509B-TPO.
+
+Headless MAME regression не отмечает реальную Sprinter-приёмку выполненной:
+для окончательного результата нужен новый guest log/pcap той же матрицы.
 
 До выполнения этих пунктов MAME полезен как экспериментальная заготовка, но не
 как источник истины для поведения драйвера Sprinter.
