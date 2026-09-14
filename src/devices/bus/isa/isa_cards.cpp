@@ -111,6 +111,7 @@
 #include "zxbus_adapter.h"
 #include "com.h"
 #include "rtl8019as.h"
+#include "3c509b.h"
 
 
 void pc_isa8_cards(device_slot_interface &device)
@@ -179,6 +180,7 @@ void pc_isa8_cards(device_slot_interface &device)
 	device.option_add("sprinter_esp", ISA8_SPRINTER_ESP);
 	device.option_add("com", ISA8_COM);
 	device.option_add("rtl8019as", ISA8_RTL8019AS);
+	device.option_add("3c509b", ISA8_3C509B);
 	//device.option_add("ubpnic", ISA8_UBPNIC);
 }
 

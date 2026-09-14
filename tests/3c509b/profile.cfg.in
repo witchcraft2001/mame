@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<mameconfig version="10">
+    <system name="sprinter">
+        <input>
+            <port tag=":@SLOT@:3c509b:EEPROM" type="CONFIG" mask="1" defvalue="0" value="@PROFILE@" />
+            <port tag=":@SLOT@:3c509b:CONFIG" type="CONFIG" mask="128" defvalue="0" value="@ACTIVATE@" />
+            <port tag=":@SLOT@:3c509b:LINK" type="CONFIG" mask="1" defvalue="0" value="@LINK@" />
+        </input>
+        <network>
+            <device tag=":@SLOT@:3c509b" interface="@INTERFACE@" mac="@MAC@" />
+        </network>
+    </system>
+</mameconfig>
