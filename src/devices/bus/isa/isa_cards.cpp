@@ -88,6 +88,7 @@
 // network
 #include "3c503.h"
 #include "3c505.h"
+#include "3c509b.h"
 #include "3xtwin.h"
 #include "eis_sad8852.h"
 #include "eis_twib.h"
@@ -158,6 +159,7 @@ void pc_isa8_cards(device_slot_interface &device)
 	device.option_add("pcmidi", ISA8_PCMIDI);
 	device.option_add("ne1000", NE1000);
 	device.option_add("3c503", EL2_3C503);
+	device.option_add("3c509b", ISA8_3C509B);
 	device.option_add("lpt", ISA8_LPT);
 	device.option_add("ibm_mfc", ISA8_IBM_MFC);
 	device.option_add("wd1002a_wx1", ISA8_WD1002A_WX1);
