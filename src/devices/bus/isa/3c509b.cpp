@@ -1175,7 +1175,10 @@ void isa8_3c509b_device::reg_write(uint8_t reg, uint16_t data)
 		{
 		case 0x00:
 		case 0x02:
-		case 0x04: put_u16le(&m_station[reg], data); break;
+		case 0x04:
+			put_u16le(&m_station[reg], data);
+			set_mac(m_station);
+			break;
 		}
 		break;
 
